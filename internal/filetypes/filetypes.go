@@ -71,7 +71,7 @@ type FileInfo struct {
 // FromFile return detailed file info for a given build file.
 // Encoding must be specified.
 // TODO: mode should probably not be necessary here.
-func FromFile(b *build.File, mode Mode) (*FileInfo, error) {
+func FromFile(b *build.File, mode Mode, updateFn UpdateFunc) (*FileInfo, error) {
 	// Handle common case. This allows certain test cases to be analyzed in
 	// isolation without interference from evaluating these files.
 	if mode == Input &&
@@ -96,8 +96,11 @@ func FromFile(b *build.File, mode Mode) (*FileInfo, error) {
 		}, nil
 	}
 
+	if updateFn == nil {
+		updateFn = update
+	}
 	i := cuegenInstance.Value()
-	i, errs := update(nil, i, i, "modes", mode.String())
+	i, errs := updateFn(nil, i, i, "modes", mode.String())
 	v := i.LookupDef("FileInfo")
 	v = v.Fill(b)
 
@@ -131,6 +134,39 @@ func FromFile(b *build.File, mode Mode) (*FileInfo, error) {
 	return fi, errs
 }
 
+type UpdateFunc func(errs errors.Error, v, i cue.Value, field, value string) (cue.Value, errors.Error)
+
+type updateArgs struct {
+	v     cue.Value
+	i     cue.Value
+	field string
+	value string
+	err   errors.Error
+}
+type updateResult struct {
+	v   cue.Value
+	err errors.Error
+}
+
+func CachedUpdate() UpdateFunc {
+	cache := make(map[updateArgs]updateResult)
+	return func(errs errors.Error, v, i cue.Value, field, value string) (cue.Value, errors.Error) {
+		args := updateArgs{
+			err:   errs,
+			v:     v,
+			i:     i,
+			field: field,
+			value: value,
+		}
+		if out, ok := cache[args]; ok {
+			return out.v, out.err
+		}
+		v, err := update(errs, v, i, field, value)
+		cache[args] = updateResult{v: v, err: err}
+		return v, err
+	}
+}
+
 func update(errs errors.Error, v, i cue.Value, field, value string) (cue.Value, errors.Error) {
 	v = v.Unify(i.Lookup(field, value))
 	if err := v.Err(); err != nil {
@@ -145,18 +181,18 @@ func update(errs errors.Error, v, i cue.Value, field, value string) (cue.Value, 
 //
 // The arguments are of the form
 //
-//     file* (spec: file+)*
+//	file* (spec: file+)*
 //
 // where file is a filename and spec is itself of the form
 //
-//     tag[=value]('+'tag[=value])*
+//	tag[=value]('+'tag[=value])*
 //
 // A file type spec applies to all its following files and until a next spec
 // is found.
 //
 // Examples:
-//     json: foo.data bar.data json+schema: bar.schema
 //
+//	json: foo.data bar.data json+schema: bar.schema
 func ParseArgs(args []string) (files []*build.File, err error) {
 	var inst, v cue.Value
 
@@ -221,9 +257,12 @@ func ParseArgs(args []string) (files []*build.File, err error) {
 // passed to a command line argument.
 //
 // Example:
-//   cue eval -o yaml:foo.data
 //
-func ParseFile(s string, mode Mode) (*build.File, error) {
+//	cue eval -o yaml:foo.data
+func ParseFile(s string, mode Mode, typeParseFn TypeParseFunc) (*build.File, error) {
+	if typeParseFn == nil {
+		typeParseFn = parseType
+	}
 	scope := ""
 	file := s
 
@@ -239,7 +278,7 @@ func ParseFile(s string, mode Mode) (*build.File, error) {
 		return nil, errors.Newf(token.NoPos, "empty file name in %q", s)
 	}
 
-	inst, val, err := parseType(scope, mode)
+	inst, val, err := typeParseFn(scope, mode)
 	if err != nil {
 		return nil, err
 	}
@@ -280,6 +319,32 @@ func toFile(i, v cue.Value, filename string) (*build.File, error) {
 			"could not determine file type")
 	}
 	return f, nil
+}
+
+type parseTypeOutput struct {
+	inst cue.Value
+	val  cue.Value
+	err  error
+}
+
+type parseTypeArgs struct {
+	s    string
+	mode Mode
+}
+
+type TypeParseFunc func(s string, mode Mode) (cue.Value, cue.Value, error)
+
+func CachedParseType() TypeParseFunc {
+	cache := make(map[parseTypeArgs]parseTypeOutput)
+	return func(s string, mode Mode) (cue.Value, cue.Value, error) {
+		args := parseTypeArgs{s: s, mode: mode}
+		if out, ok := cache[args]; ok {
+			return out.inst, out.val, out.err
+		}
+		inst, val, err := parseType(s, mode)
+		cache[args] = parseTypeOutput{inst, val, err}
+		return inst, val, err
+	}
 }
 
 func parseType(s string, mode Mode) (inst, val cue.Value, err error) {

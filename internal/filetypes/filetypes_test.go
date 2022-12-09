@@ -245,7 +245,7 @@ func TestFromFile(t *testing.T) {
 	}}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			info, err := FromFile(&tc.in, tc.mode)
+			info, err := FromFile(&tc.in, tc.mode, nil)
 			check(t, tc.out, info, err)
 		})
 	}
@@ -318,7 +318,7 @@ func TestParseFile(t *testing.T) {
 	}}
 	for _, tc := range testCases {
 		t.Run(tc.in, func(t *testing.T) {
-			f, err := ParseFile(tc.in, tc.mode)
+			f, err := ParseFile(tc.in, tc.mode, nil)
 			check(t, tc.out, f, err)
 		})
 	}

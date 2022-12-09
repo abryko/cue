@@ -162,6 +162,7 @@ type Config struct {
 	ProtoPath  []string
 	Format     []format.Option
 	ParseFile  func(name string, src interface{}) (*ast.File, error)
+	Update     filetypes.UpdateFunc
 }
 
 // NewDecoder returns a stream of non-rooted data expressions. The encoding
@@ -373,7 +374,7 @@ func (d *Decoder) validate(f *ast.File, b *build.File) {
 	if d.err != nil {
 		return
 	}
-	fi, err := filetypes.FromFile(b, filetypes.Input)
+	fi, err := filetypes.FromFile(b, filetypes.Input, d.cfg.Update)
 	if err != nil {
 		d.err = err
 		return

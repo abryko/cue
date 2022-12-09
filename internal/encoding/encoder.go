@@ -107,7 +107,7 @@ func NewEncoder(f *build.File, cfg *Config) (*Encoder, error) {
 
 	switch f.Encoding {
 	case build.CUE:
-		fi, err := filetypes.FromFile(f, cfg.Mode)
+		fi, err := filetypes.FromFile(f, cfg.Mode, nil)
 		if err != nil {
 			return nil, err
 		}

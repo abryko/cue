@@ -449,6 +449,7 @@ func (p *buildPlan) getDecoders(b *build.Instance) (schemas, values []*decoderIn
 	if p.cfg.overrideDefault {
 		files = append(files, b.UnknownFiles...)
 	}
+	update := filetypes.CachedUpdate()
 	for _, f := range files {
 		if !b.User && !p.matchFile(f.Filename) {
 			continue
@@ -485,7 +486,7 @@ func (p *buildPlan) getDecoders(b *build.Instance) (schemas, values []*decoderIn
 		}
 		d := encoding.NewDecoder(f, &c)
 
-		fi, err := filetypes.FromFile(f, p.cfg.outMode)
+		fi, err := filetypes.FromFile(f, p.cfg.outMode, update)
 		if err != nil {
 			return schemas, values, err
 		}
@@ -691,7 +692,7 @@ func (b *buildPlan) parseFlags() (err error) {
 	if out != "" {
 		outFile = out + ":" + outFile
 	}
-	b.outFile, err = filetypes.ParseFile(outFile, b.cfg.outMode)
+	b.outFile, err = filetypes.ParseFile(outFile, b.cfg.outMode, nil)
 	if err != nil {
 		return err
 	}
