@@ -259,7 +259,7 @@ func ParseArgs(args []string) (files []*build.File, err error) {
 // Example:
 //
 //	cue eval -o yaml:foo.data
-func ParseFile(s string, mode Mode, typeParseFn TypeParseFunc) (*build.File, error) {
+func ParseFile(s string, mode Mode, typeParseFn ParseTypeFunc) (*build.File, error) {
 	if typeParseFn == nil {
 		typeParseFn = parseType
 	}
@@ -332,9 +332,9 @@ type parseTypeArgs struct {
 	mode Mode
 }
 
-type TypeParseFunc func(s string, mode Mode) (cue.Value, cue.Value, error)
+type ParseTypeFunc func(s string, mode Mode) (cue.Value, cue.Value, error)
 
-func CachedParseType() TypeParseFunc {
+func CachedParseType() ParseTypeFunc {
 	cache := make(map[parseTypeArgs]parseTypeOutput)
 	return func(s string, mode Mode) (cue.Value, cue.Value, error) {
 		args := parseTypeArgs{s: s, mode: mode}

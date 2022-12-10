@@ -167,13 +167,19 @@ func (l *loader) importPkg(pos token.Pos, p *build.Instance) []*build.Instance {
 		}
 	}
 
+	var parseType filetypes.ParseTypeFunc
+	if l.parseType != nil {
+		parseType = l.parseType
+
+	} else {
+		parseType = filetypes.CachedParseType()
+	}
 	for _, d := range dirs {
 		for dir := filepath.Clean(d[1]); ctxt.isDir(dir); {
 			files, err := ctxt.readDir(dir)
 			if err != nil && !os.IsNotExist(err) {
 				return retErr(errors.Wrapf(err, pos, "import failed reading dir %v", dirs[0][1]))
 			}
-			parseType := filetypes.CachedParseType()
 			for _, f := range files {
 				if f.IsDir() {
 					continue

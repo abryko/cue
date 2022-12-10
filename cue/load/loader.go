@@ -54,6 +54,12 @@ func Instances(args []string, c *Config) []*build.Instance {
 	c = newC
 
 	l := c.loader
+	if l.update == nil {
+		l.update = filetypes.CachedUpdate()
+	}
+	if l.parseType == nil {
+		l.parseType = filetypes.CachedParseType()
+	}
 
 	// TODO: require packages to be placed before files. At some point this
 	// could be relaxed.
@@ -138,6 +144,8 @@ type loader struct {
 	tags         []*tag // tags found in files
 	buildTags    map[string]bool
 	replacements map[ast.Node]ast.Node
+	update       filetypes.UpdateFunc
+	parseType    filetypes.ParseTypeFunc
 }
 
 func (l *loader) abs(filename string) string {
@@ -216,7 +224,13 @@ func (l *loader) cueFilesPackage(files []*build.File) *build.Instance {
 }
 
 func (l *loader) addFiles(dir string, p *build.Instance) {
-	update := filetypes.CachedUpdate()
+	var update filetypes.UpdateFunc
+	if l.update != nil {
+		update = l.update
+	} else {
+		update = filetypes.CachedUpdate()
+	}
+
 	for _, f := range p.BuildFiles {
 		d := encoding.NewDecoder(f, &encoding.Config{
 			Stdin:     l.cfg.stdin(),
